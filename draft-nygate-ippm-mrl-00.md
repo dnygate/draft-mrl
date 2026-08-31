@@ -6,7 +6,7 @@ category: info
 submissiontype: IETF
 consensus: true
 v: 3
-area: "Web and Internet Transport"
+area: "Operations and Management"
 workgroup: "IP Performance Measurement"
 keyword:
   - latency
@@ -69,7 +69,7 @@ informative:
 
 This document defines mouth-to-ear response latency (MRL), a performance metric for
 conversational voice systems, together with an active method for measuring it at the
-RTP egress reference point of the calling endpoint. MRL is the interval between the
+RTP reference point of the calling endpoint. MRL is the interval between the
 transmission of the final speech sample of a caller's utterance and the arrival of the
 first sample of the system's response audio. Two variants are defined, one taken at
 packet arrival and one taken behind a de-jitter buffer of stated target depth. The
@@ -187,7 +187,7 @@ point at which to observe it.
 
 The framework of {{RFC2330}} and the delay metric of {{RFC7679}} inform the treatment of
 error and uncertainty. The method described here is an active method in the taxonomy of
-{{RFC7799}}: it generates the stimulus it measures the response to.
+{{RFC7799}}, since it generates the stimulus whose response it measures.
 
 {{RFC3611}} and its extensions define a reporting mechanism by which endpoints convey
 media quality metrics in band. Conveying MRL in that manner is out of scope for this
@@ -316,9 +316,10 @@ Ingress MRL takes t1 at the arrival instant of the onset sample, that is, at the
 reference point with no buffering applied.
 
 Ingress MRL isolates the contribution of the SUT and of the network path from the
-buffering policy of the calling endpoint. Its variance under a jittered path is equal to
-the jitter of that path, which is the metric reporting the path faithfully rather than a
-limitation of the method.
+buffering policy of the calling endpoint. Its variance under a jittered path tracks the
+jitter of that path, because the metric reports the path as it finds it, and an
+implementation showing less variance than the path exhibits is smoothing a quantity it
+was asked to observe.
 
 ### Playout MRL {#playout}
 
@@ -342,9 +343,10 @@ on both legs and still exhibit an MRL an order of magnitude larger.
 
 ### Both variants required
 
-An implementation MUST report both variants. Reporting Ingress MRL alone understates the
-interval experienced by a caller. Reporting Playout MRL alone conflates the SUT with the
-buffering policy of the calling endpoint.
+An implementation MUST report both variants. Ingress MRL on its own understates the
+interval a caller experiences, while a bare Playout MRL leaves the SUT confounded with
+whatever buffering policy the calling endpoint happened to apply, so neither figure can
+be interpreted without the other.
 
 ## Response onset {#onset}
 
@@ -421,8 +423,10 @@ of the codec in use. The stimulus MUST be hashed and the hash MUST be recorded w
 capture, so that a changed stimulus invalidates a comparison loudly rather than
 silently.
 
-Codecs are those of {{RFC3551}} and {{G711}}; the method is codec independent, and the
-codec in use MUST be reported.
+The method is independent of the codec, and the codec in use MUST be reported with any
+figure derived under it. Where a payload format from {{RFC3551}} is used, the sample rate
+and frame period follow that profile, and the companding of {{G711}} applies to the PCMU
+and PCMA formats.
 
 ## Transmission pacing
 
@@ -604,12 +608,17 @@ A reported MRL figure MUST be accompanied by:
 
 # Use and Applications
 
-The metric supports comparison of conversational voice systems from the position of a
-caller, characterisation of a single system across configurations or load levels, and
-regression testing of a deployed system over time.
+The metric supports:
 
-The metric is not a measure of response quality, of speech recognition accuracy, or of
-the usefulness of the response. It measures an interval and nothing else.
+* comparison of conversational voice systems from the position of a caller;
+* characterisation of a single system across configurations or load levels;
+* regression testing of a deployed system over time.
+
+MRL measures an interval and carries no information about what the response contained.
+Response quality, recognition accuracy and the usefulness of the reply are separate
+quantities needing separate instruments, and a system that answers quickly and wrongly
+will score well here. Cases in which the metric does not apply, or applies only with
+care, are set out in {{limits}}.
 
 # Applicability and Limitations {#limits}
 
@@ -641,17 +650,23 @@ The method described here generates traffic directed at a system under test and 
 responses from it. Measurement of a system operated by another party without that party's
 authorisation may constitute unauthorised use, may breach terms of service, and at
 sufficient volume is indistinguishable from a denial of service attempt. Parties
-performing measurement SHOULD obtain authorisation, SHOULD limit measurement rate to a
-level agreed with the operator, and SHOULD identify their traffic where a mechanism to do
-so exists.
+performing measurement:
+
+* SHOULD obtain authorisation from the operator of the system under test;
+* SHOULD limit the measurement rate to a level agreed with that operator;
+* SHOULD identify their measurement traffic where a mechanism to do so exists.
 
 Captures produced by this method contain audio. Where stimulus material contains recorded
 human speech, that material is personal data in many jurisdictions and may carry
-biometric significance. Captures also contain the SUT's response audio, which may reflect
-the content of the stimulus. Implementers SHOULD prefer synthetic or consented stimulus
-material, SHOULD apply access control to stored captures, and SHOULD consider retention
-limits. Publication of captures as measurement evidence, which the method otherwise
-encourages, has to be weighed against this.
+biometric significance, and captures also hold the SUT's response audio, which can
+reflect the content of the stimulus. Implementers:
+
+* SHOULD prefer synthetic or consented stimulus material;
+* SHOULD apply access control to stored captures;
+* SHOULD set a retention limit rather than keeping captures indefinitely.
+
+Publication of captures as measurement evidence, which the method otherwise encourages,
+has to be weighed against these considerations.
 
 Reported figures may be commercially sensitive to the operator of the system under test.
 The configuration identifier described in {{reporting}} is specified as an identifier
@@ -675,9 +690,11 @@ working group.
 
 # Draft Performance Metrics Registry Entry {#registry}
 
-> \[\[EDITOR'S NOTE: filled in against the column structure of Section 7 of {{RFC8911}}
-> as far as the current text supports. Incomplete deliberately; the gaps are the same
-> gaps flagged in the body.\]\]
+> \[\[EDITOR'S NOTE: filled in against the column structure defined in Section 7 of
+> {{RFC8911}}, using the blank template in Section 11 of that document, as far as the
+> current text supports. Incomplete deliberately; the gaps are the same gaps flagged in
+> the body. Note that Section 7.1.2 imposes a structured naming convention on registered
+> metrics, which the Name entry below has yet to satisfy.\]\]
 
 Identifier:
 : TBD by IANA
@@ -749,17 +766,18 @@ between this document and that implementation is a defect in the implementation.
 > \[\[EDITOR'S NOTE: remove before submission. Retained here so that gaps are visible
 > while the draft is being written.\]\]
 
-| RFC 6390 Section 5.4 item | Where | State |
-|---|---|---|
-| Metric Name | Metric Definition | done |
-| Metric Description | Metric Definition | done |
-| Method of Measurement or Calculation | Method of Measurement | mostly done; annotator conformance open |
-| Units of Measurement | Units of Measurement | done |
-| Measurement Point(s) with Potential Measurement Domain | Measurement Points | done |
-| Measurement Timing | Measurement Timing | open; multi-turn conditioning unspecified |
-| Use and Applications | Use and Applications | done |
-| Reporting Model | Reporting | fields done; interchange format missing |
-| Measurement error and uncertainty | Sources of Error | done |
+| RFC 6390 Section 5.4 item | Class | Where | State |
+|---|---|---|---|
+| Metric Name | normative | Metric Definition | done |
+| Metric Description | normative | Metric Definition | done |
+| Method of Measurement or Calculation | normative | Method of Measurement | mostly done; annotator conformance open |
+| Units of Measurement | normative | Units of Measurement | done |
+| Measurement Point(s) with Potential Measurement Domain | normative | Measurement Points | done |
+| Measurement Timing | normative | Measurement Timing | open; multi-turn conditioning unspecified |
+| Implementation | informative | Appendix, Reference Implementation | done |
+| Verification | informative | Sources of Error and Calibration | done |
+| Use and Applications | informative | Use and Applications | done |
+| Reporting Model | informative | Reporting | fields done; interchange format missing |
 
 # Open Questions for Review {#questions}
 
@@ -782,7 +800,7 @@ between this document and that implementation is a defect in the implementation.
 8. British spelling is used throughout this source. Confirm against current RFC Editor
    style before submission and convert if required.
 
-# Acknowledgments
+# Acknowledgements
 {:numbered="false"}
 
 TBD.
