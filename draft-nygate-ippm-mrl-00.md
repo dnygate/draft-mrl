@@ -23,7 +23,7 @@ venue:
 author:
   -
     fullname: Daniel Nygate
-    email: daniel.nygate@unifiededge.com
+    email: dnygate@outlook.com
 normative:
   RFC3550:
   RFC3551:
