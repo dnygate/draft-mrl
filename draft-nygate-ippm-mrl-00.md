@@ -703,7 +703,7 @@ The following is a report with the per-measurement and capture arrays elided.
     "name": "voice-ai-latency-harness",
     "version": "0.1.1",
     "calibration": {
-      "conditions": "clean channel, 20 ms frame grid, PCMU, 40 ms playout target",
+      "conditions": "clean channel, 20 ms grid, PCMU",
       "ingress": { "bias_ms": -0.40, "p95_abs_error_ms": 2.38 },
       "playout": { "bias_ms": -0.40, "p95_abs_error_ms": 2.38 },
       "reference": "https://doi.org/10.5281/zenodo.22124823"
@@ -716,9 +716,12 @@ The following is a report with the per-measurement and capture arrays elided.
     "sample_rate_hz": 8000,
     "playout_target_ms": 40.0,
     "onset_variants": [
-      { "name": "sensitive", "margin_db": 6.0,  "absolute_dbov": -55.0, "sustain_ms": 10.0 },
-      { "name": "headline",  "margin_db": 10.0, "absolute_dbov": -50.0, "sustain_ms": 20.0 },
-      { "name": "strict",    "margin_db": 12.0, "absolute_dbov": -45.0, "sustain_ms": 30.0 }
+      { "name": "sensitive", "margin_db": 6.0,
+        "absolute_dbov": -55.0, "sustain_ms": 10.0 },
+      { "name": "headline", "margin_db": 10.0,
+        "absolute_dbov": -50.0, "sustain_ms": 20.0 },
+      { "name": "strict", "margin_db": 12.0,
+        "absolute_dbov": -45.0, "sustain_ms": 30.0 }
     ],
     "headline_variant": "headline"
   },
@@ -732,9 +735,17 @@ The following is a report with the per-measurement and capture arrays elided.
     "n_attempted": 20,
     "n_reported": 18,
     "n_discarded": 2,
-    "discard_reasons": { "onset_not_found": 1, "tx_pacing_deviation": 1 },
-    "ingress": { "mean_ms": 812.4, "p50_ms": 796.0, "p95_ms": 1043.2, "max_ms": 1101.7 },
-    "playout": { "mean_ms": 852.4, "p50_ms": 836.0, "p95_ms": 1083.2, "max_ms": 1141.7 },
+    "discard_reasons": {
+      "onset_not_found": 1, "tx_pacing_deviation": 1
+    },
+    "ingress": {
+      "mean_ms": 812.4, "p50_ms": 796.0,
+      "p95_ms": 1043.2, "max_ms": 1101.7
+    },
+    "playout": {
+      "mean_ms": 852.4, "p50_ms": 836.0,
+      "p95_ms": 1083.2, "max_ms": 1141.7
+    },
     "onset_definition_uncertainty_ms": { "p50": 4.7, "max": 9.8 },
     "advisory_flags": { "high_loss": 1, "high_late_discard": 0 }
   }

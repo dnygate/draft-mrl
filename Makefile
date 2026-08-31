@@ -13,7 +13,7 @@ DRAFT   := draft-nygate-ippm-mrl-00
 KRAMDOWN := /opt/homebrew/lib/ruby/gems/4.0.0/bin/kramdown-rfc
 XML2RFC  := $(HOME)/.venvs/ietf-tools/bin/xml2rfc
 
-.PHONY: all txt html clean check
+.PHONY: all txt html clean check lint
 
 all: txt
 
@@ -38,6 +38,13 @@ check: $(DRAFT).md
 	@! grep -ni "claude\|copilot\|chatgpt\|anthropic\|ai assistant" $< \
 		|| (echo "FAIL: tooling reference found" && false)
 	@echo "ok"
+
+# Internet-Draft text is limited to 72 columns. xml2rfc wraps prose but leaves
+# sourcecode blocks alone, so an over-wide JSON example only surfaces here.
+lint: $(DRAFT).txt
+	@echo "checking rendered line length"
+	@if awk 'length > 72 {print NR": "length" chars: "$$0}' $< | grep .; then \
+		echo "FAIL: over-length lines above"; false; else echo "ok"; fi
 
 clean:
 	rm -f $(DRAFT).xml $(DRAFT).txt $(DRAFT).html kramdown.err
