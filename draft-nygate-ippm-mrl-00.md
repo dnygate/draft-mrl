@@ -28,6 +28,7 @@ author:
 normative:
   RFC3550:
   RFC3551:
+  RFC8259:
 informative:
   RFC2330:
   RFC6076:
@@ -598,13 +599,156 @@ A reported MRL figure MUST be accompanied by:
 * an identifier for the SUT configuration sufficient to establish that two figures refer
   to the same configuration, without necessarily disclosing that configuration.
 
-## Reporting format
+## Reporting format {#format}
 
-> \[\[TODO: specify an interchange record. This is the section that makes the document
-> useful to somebody who is not the author, and it does not yet exist in any form. The
-> reference implementation produces a JSON structure that is close to adequate and would
-> need tightening into a schema, with every field above mandatory and with the raw
-> capture referenced by hash. Draft it for -01.\]\]
+A reported result MUST be expressible as a JSON object {{RFC8259}} carrying the members
+defined below. The format exists so that a reader can establish, without contacting the
+party who produced a figure, whether two figures were derived under the same choices.
+
+The `schema` member MUST be present and MUST be the string `mrl-report/1` for reports
+conforming to this document.
+
+### instrument
+
+Describes the measuring implementation and its calibration. All members are REQUIRED.
+
+`name`, `version`:
+: Identify the implementation that produced the report.
+
+`calibration`:
+: An object recording the outcome of the procedure in {{errors}}. It MUST carry
+  `conditions`, a human-readable statement of the channel and host conditions under which
+  calibration was performed, and for each of `ingress` and `playout` a `bias_ms` and a
+  `p95_abs_error_ms`. It SHOULD carry `reference`, a URI or DOI at which the calibration
+  evidence can be inspected. An implementation that has not been calibrated MUST set
+  `calibration` to `null` rather than omitting it, and every figure in such a report is
+  an upper bound rather than a point estimate.
+
+### measurement
+
+Describes the choices along the axes in {{existing}}. All members are REQUIRED.
+
+`reference_point`:
+: Where t1 was observed. The value `rtp-endpoint` denotes the reference point defined in
+  {{refpoint}}. Any other value denotes an observation point that includes additional and
+  possibly uncharacterised transport, and MUST be accompanied by `reference_point_notes`
+  describing what lies inside the interval.
+
+`codec`, `frame_period_ms`, `sample_rate_hz`:
+: The media parameters in force.
+
+`playout_target_ms`:
+: The de-jitter buffer target depth used to derive Playout MRL.
+
+`onset_variants`:
+: An array of objects, each carrying `name`, `margin_db`, `absolute_dbov` and
+  `sustain_ms`. The parameters MUST be stated rather than referenced by name alone, so
+  that a report remains interpretable if the defaults in {{onset}} are ever revised.
+
+`headline_variant`:
+: The `name` of the variant whose figures are quoted as the headline.
+
+### subject
+
+Identifies what was measured. `stimulus_id` and `stimulus_sha256` are REQUIRED.
+`sut_identifier` is REQUIRED and `sut_config_sha256` is RECOMMENDED, the latter allowing
+two reports to be shown to concern the same configuration without that configuration
+being disclosed.
+
+### results
+
+Aggregate figures. All members are REQUIRED.
+
+`n_attempted`, `n_reported`, `n_discarded`:
+: Counts of measurements. `n_attempted` MUST equal `n_reported` plus `n_discarded`.
+
+`discard_reasons`:
+: An object mapping each blocking condition in {{qc}} to the number of measurements it
+  discarded. The counts MUST sum to `n_discarded`.
+
+`ingress`, `playout`:
+: Objects carrying at least `mean_ms`, `p50_ms`, `p95_ms` and `max_ms`, computed over the
+  reported measurements under the headline variant. Values are signed.
+
+`onset_definition_uncertainty_ms`:
+: The spread of MRL across all variants in `onset_variants`, carrying at least `p50` and
+  `max`. This member MUST be present, since a headline figure quoted without it is
+  incomplete under {{onset}}.
+
+`advisory_flags`:
+: An object mapping each advisory condition in {{qc}} to the number of reported
+  measurements carrying it.
+
+### measurements and captures
+
+`measurements` SHOULD carry one object per individual measurement, each with the
+measurement's identifier, its t0 and t1 in nanoseconds on the instrument's monotonic
+clock, its ingress and playout MRL under every variant, and any flags raised. `captures`
+SHOULD carry one object per capture with the measurement identifier, a `sha256` of the
+capture file, and a URI at which it can be obtained.
+
+Both members are optional because a party may be unable to publish raw material.
+Omitting them removes the reader's ability to re-derive the figures under a different
+onset definition, which {{onset}} identifies as the dominant uncertainty term, so a
+report omitting them is weaker evidence than one that includes them.
+
+### Example
+
+The following is a report with the per-measurement and capture arrays elided.
+
+~~~ json
+{
+  "schema": "mrl-report/1",
+  "instrument": {
+    "name": "voice-ai-latency-harness",
+    "version": "0.1.1",
+    "calibration": {
+      "conditions": "clean channel, 20 ms frame grid, PCMU, 40 ms playout target",
+      "ingress": { "bias_ms": -0.40, "p95_abs_error_ms": 2.38 },
+      "playout": { "bias_ms": -0.40, "p95_abs_error_ms": 2.38 },
+      "reference": "https://doi.org/10.5281/zenodo.22124823"
+    }
+  },
+  "measurement": {
+    "reference_point": "rtp-endpoint",
+    "codec": "PCMU",
+    "frame_period_ms": 20.0,
+    "sample_rate_hz": 8000,
+    "playout_target_ms": 40.0,
+    "onset_variants": [
+      { "name": "sensitive", "margin_db": 6.0,  "absolute_dbov": -55.0, "sustain_ms": 10.0 },
+      { "name": "headline",  "margin_db": 10.0, "absolute_dbov": -50.0, "sustain_ms": 20.0 },
+      { "name": "strict",    "margin_db": 12.0, "absolute_dbov": -45.0, "sustain_ms": 30.0 }
+    ],
+    "headline_variant": "headline"
+  },
+  "subject": {
+    "sut_identifier": "system-A",
+    "sut_config_sha256": "9f2b...c41e",
+    "stimulus_id": "eval-set-1/utt-017",
+    "stimulus_sha256": "3ad1...77b0"
+  },
+  "results": {
+    "n_attempted": 20,
+    "n_reported": 18,
+    "n_discarded": 2,
+    "discard_reasons": { "onset_not_found": 1, "tx_pacing_deviation": 1 },
+    "ingress": { "mean_ms": 812.4, "p50_ms": 796.0, "p95_ms": 1043.2, "max_ms": 1101.7 },
+    "playout": { "mean_ms": 852.4, "p50_ms": 836.0, "p95_ms": 1083.2, "max_ms": 1141.7 },
+    "onset_definition_uncertainty_ms": { "p50": 4.7, "max": 9.8 },
+    "advisory_flags": { "high_loss": 1, "high_late_discard": 0 }
+  }
+}
+~~~
+
+> \[\[EDITOR'S NOTE: this structure is deliberately close to what the reference
+> implementation already emits, which keeps at least one producer honest, and it is the
+> part of the document most likely to change on review. Two questions in particular.
+> Whether the format should be registered as a media type. And whether `reference_point`
+> should be an enumeration with values for carrier-side and bridge-side recording, so
+> that efforts observing elsewhere can produce conforming reports that declare the
+> difference, rather than being unable to conform at all. The second would widen adoption
+> considerably and is probably worth doing.\]\]
 
 # Use and Applications
 
@@ -777,7 +921,7 @@ between this document and that implementation is a defect in the implementation.
 | Implementation | informative | Appendix, Reference Implementation | done |
 | Verification | informative | Sources of Error and Calibration | done |
 | Use and Applications | informative | Use and Applications | done |
-| Reporting Model | informative | Reporting | fields done; interchange format missing |
+| Reporting Model | informative | Reporting | done; media type registration open |
 
 # Open Questions for Review {#questions}
 
@@ -789,7 +933,10 @@ between this document and that implementation is a defect in the implementation.
    a publication requirement.
 3. Whether multi-turn measurement within one session is in scope, and what has to be
    reported about warm-up effects.
-4. The interchange record in {{reporting}}.
+4. The interchange record in {{format}}. Whether it warrants a registered media type,
+   and whether `reference_point` should enumerate observation points other than the RTP
+   endpoint so that efforts measuring from a carrier recording can produce conforming
+   reports which declare that difference.
 5. Whether Informational is the right category, or whether the conformance language
    argues for Standards Track.
 6. Venue. Whether IPPM's charter admits a metric of this kind, and if not whether
