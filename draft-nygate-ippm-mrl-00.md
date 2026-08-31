@@ -1,0 +1,788 @@
+---
+title: "Mouth-to-Ear Response Latency for Conversational Voice Systems: Metric Definition and Active Measurement Method"
+abbrev: "Mouth-to-Ear Response Latency"
+docname: draft-nygate-ippm-mrl-00
+category: info
+submissiontype: IETF
+consensus: true
+v: 3
+area: "Web and Internet Transport"
+workgroup: "IP Performance Measurement"
+keyword:
+  - latency
+  - conversational
+  - RTP
+  - endpointing
+  - voice
+venue:
+  group: "IP Performance Measurement"
+  type: "Working Group"
+  mail: "ippm@ietf.org"
+  arch: "https://mailarchive.ietf.org/arch/browse/ippm/"
+  github: "dnygate/draft-mrl"
+author:
+  -
+    fullname: Daniel Nygate
+    organization: Hudl Communications, Inc.
+    email: daniel.nygate@unifiededge.com
+normative:
+  RFC3550:
+  RFC3551:
+informative:
+  RFC2330:
+  RFC6076:
+  RFC6390:
+  RFC7679:
+  RFC7799:
+  RFC8911:
+  RFC8912:
+  RFC3611:
+  G114:
+    title: "One-way transmission time"
+    author:
+      - organization: ITU-T
+    date: 2003
+    seriesinfo:
+      ITU-T: Recommendation G.114
+  G711:
+    title: "Pulse code modulation (PCM) of voice frequencies"
+    author:
+      - organization: ITU-T
+    date: 1988
+    seriesinfo:
+      ITU-T: Recommendation G.711
+  HARNESS:
+    title: "voice-ai-latency-harness: an instrument for measuring mouth-to-ear response latency"
+    author:
+      - fullname: Daniel Nygate
+    date: 2026
+    seriesinfo:
+      DOI: 10.5281/zenodo.22124823
+  TTFAB:
+    title: "Voice agent latency benchmark: time to first audio byte measured from real phone calls"
+    author:
+      - organization: OpenBenchmarks Labs
+    date: 2026
+    target: https://openbenchmarks.com/voice-agent-latency
+
+--- abstract
+
+This document defines mouth-to-ear response latency (MRL), a performance metric for
+conversational voice systems, together with an active method for measuring it at the
+RTP egress reference point of the calling endpoint. MRL is the interval between the
+transmission of the final speech sample of a caller's utterance and the arrival of the
+first sample of the system's response audio. Two variants are defined, one taken at
+packet arrival and one taken behind a de-jitter buffer of stated target depth. The
+method is specified so that both timestamps are drawn from a single clock on a single
+host, so that the metric requires no synchronisation between the measuring endpoint and
+the system under test. Requirements for stimulus material, capture content, quality
+control, calibration and reporting are given.
+
+--- middle
+
+# Introduction
+
+Conversational voice systems built from speech recognition, language modelling and
+speech synthesis components are now widely deployed over SIP and RTP. Response latency
+is a primary determinant of whether such a system is usable, and it is measured today by
+several parties who do not agree on what is being measured. There is no common
+definition of the quantity, no agreed reference point at which to observe it, and no
+convention for reporting its uncertainty.
+
+Figures produced under different assumptions are routinely compared as though they were
+commensurable, which is the practical problem this document exists to address.
+{{decomposition}} sets out the terms that separate one figure from another, and
+{{existing}} describes the axes along which current measurement practice divides.
+
+This document takes no position on the magnitude of any term, on the accuracy of any
+published figure, or on the merits of any existing measurement effort. It defines a
+quantity and a method of observing it, so that figures produced by different parties are
+comparable.
+
+## Motivation and decomposition {#decomposition}
+
+For a caller connected to a conversational voice system over SIP and RTP, the interval
+between the end of the caller's utterance and the arrival of response audio comprises,
+in order of occurrence:
+
+| Term |
+|---|
+| de-jitter buffer depth on the inbound leg |
+| voice activity detection and endpointing decision |
+| speech recognition finalisation after the endpoint decision |
+| orchestration, retrieval and any tool invocation |
+| language model time to first token |
+| speech synthesis time to first audio |
+| encoding, packetisation and media relay |
+| de-jitter buffer depth on the outbound leg |
+
+A figure covering one or two of these terms does not predict the interval a caller
+experiences, and the terms are not separable by observation at the caller. MRL is
+defined here as the aggregate, observed at a single reference point, precisely because
+the aggregate is what an external observer can measure without instrumenting the system
+under test.
+
+## Existing practice {#existing}
+
+Two kinds of figure are published today.
+
+Component-level figures are reported by the operators of individual components, most
+commonly the interval from a request reaching a speech synthesis endpoint to the first
+audio byte returned, and less commonly the interval to a language model's first token.
+These are observed at an API boundary internal to the system and cover a subset of the
+terms above.
+
+Caller-side figures are produced by placing a call and observing the response. At least
+one such effort publishes both its results and its tooling openly {{TTFAB}}, reporting
+the interval between the caller's speech end and the onset of the response as observed
+in a recording of the call rather than in any timestamp reported by the system.
+
+Caller-side efforts differ from one another along axes that render their outputs
+incomparable, and those axes are the reason this document exists:
+
+* the reference point at which the response is observed, which may be an RTP endpoint,
+  a recording made by a carrier or a conferencing bridge, or an endpoint's audio device,
+  each placing a different and frequently uncharacterised quantity of transport and
+  buffering inside the measured interval;
+* the determination of the caller's speech end, which may be derived from a voice
+  activity detector applied to the transmitted audio, or from prior annotation of known
+  stimulus material;
+* the treatment of buffering, since an interval taken at packet arrival and an interval
+  taken after a de-jitter buffer differ by the depth of that buffer;
+* the definition of response onset, which for audio that ramps in gradually is a choice
+  of threshold rather than an observation;
+* whether the measuring instrument has itself been calibrated against a known delay, and
+  therefore whether a reported figure is a point estimate or an upper bound.
+
+An effort that states its choices along these axes produces figures a reader can
+interpret, whereas two efforts that have chosen differently produce figures which cannot
+be placed side by side even when each is internally correct. This document specifies one
+set of choices and requires that they be reported alongside any figure derived under
+them.
+
+## Scope
+
+This document specifies:
+
+* the definition of the MRL metric and its two required variants;
+* the method of measurement, including the reference point, the determination of the
+  interval endpoints, and the required contents of a capture;
+* the conditions under which a measurement MUST be treated as invalid;
+* the fields that MUST accompany a reported figure.
+
+This document does not specify endpointing strategy, barge-in handling, speech
+recognition or synthesis behaviour, or any property of the system under test. It does
+not specify a signalling protocol; the method assumes an established RTP session and is
+independent of how that session was established.
+
+## Relationship to existing work
+
+The metric defined here is an application-layer performance metric in the sense of
+{{RFC6390}}, and this document follows the template in Section 5.4 of that document.
+{{RFC6076}} defines end-to-end performance metrics for telephony sessions at the SIP
+layer and is the closest existing IETF work in subject matter; the metric defined here
+concerns the media plane rather than signalling, and is complementary. No existing IETF
+document defines the quantity described in {{decomposition}} or specifies a reference
+point at which to observe it.
+
+The framework of {{RFC2330}} and the delay metric of {{RFC7679}} inform the treatment of
+error and uncertainty. The method described here is an active method in the taxonomy of
+{{RFC7799}}: it generates the stimulus it measures the response to.
+
+{{RFC3611}} and its extensions define a reporting mechanism by which endpoints convey
+media quality metrics in band. Conveying MRL in that manner is out of scope for this
+document and is noted in {{future}} as possible follow-on work.
+
+> \[\[EDITOR'S NOTE, on venue. The IPPM charter bounds the group's work to "metrics and
+> methodologies which are applicable over transport-layer protocols over IP", while also
+> covering "applications running over transport layer protocols". Whether a metric whose
+> dominant terms are speech recognition, inference and synthesis falls inside that
+> boundary is a fair question and should be settled before effort is spent on -01.
+>
+> The precedent in favour is draft-ietf-ippm-responsiveness, an adopted IPPM work item
+> targeting Proposed Standard, which measures at the application layer over HTTP/2 and
+> HTTP/3 and justifies itself explicitly on user experience. The argument against is that
+> responsiveness remains a property of the network under load, whereas most of MRL is
+> not attributable to the network at all.
+>
+> If IPPM declines, the alternatives are to take the question to DISPATCH, which exists
+> for work with no obvious home, or to pursue publication through the Independent
+> Submission stream. The document is written to stand in any of the three.
+>
+> Separately, decide whether to pursue registration in the Performance Metrics Registry
+> ({{RFC8911}}, initially populated by {{RFC8912}}); {{registry}} holds a draft entry.
+> The registry has to date been populated with IP-layer path metrics, so eligibility
+> should be confirmed before the appendix is presented as a proposal.\]\]
+
+# Conventions and Definitions
+
+{::boilerplate bcp14-tagged}
+
+The following terms are used throughout.
+
+Calling endpoint:
+: The endpoint that generates the stimulus utterance and observes the response. All
+  measurement is performed here.
+
+System under test (SUT):
+: The conversational voice system that receives the stimulus and generates a response.
+  The method treats the SUT as opaque.
+
+Reference point:
+: The point at which timestamps are taken. See {{refpoint}}.
+
+Stimulus:
+: A prerecorded utterance transmitted by the calling endpoint to elicit a response.
+
+Speech end:
+: The final sample of speech in the stimulus, determined offline. See {{t0}}.
+
+Response onset:
+: The first sample of the SUT's response audio, determined offline. See {{onset}}.
+
+# Metric Definition
+
+## Metric name
+
+Mouth-to-Ear Response Latency (MRL), reported in two variants named Ingress MRL and
+Playout MRL.
+
+## Metric description
+
+MRL is the interval between the instant at which the calling endpoint transmits the
+final speech sample of a stimulus utterance and the instant at which the first sample of
+the SUT's response reaches the calling endpoint.
+
+MRL is defined as:
+
+~~~
+MRL = t1 - t0
+~~~
+
+where t0 and t1 are as defined in {{t0}} and {{t1}}.
+
+MRL is signed. A negative value indicates that response audio reached the calling
+endpoint before the stimulus had finished being transmitted, which occurs with
+aggressive endpointing and with backchannel responses. Implementations MUST report
+negative values as measured and MUST NOT clamp them to zero.
+
+## Interval start: t0 {#t0}
+
+t0 is the instant at which the final speech sample of the stimulus is transmitted by the
+calling endpoint at the reference point.
+
+t0 MUST be determined by:
+
+1. annotating the stimulus offline to sample precision to locate the speech end;
+2. mapping that sample onto the RTP packet that carried it, using RTP timestamps as
+   defined in {{RFC3550}};
+3. interpolating within that packet at the sample rate to obtain the sample's offset
+   from the packet's transmission instant.
+
+t0 is therefore the transmission instant of the carrying packet plus the target sample's
+offset within that packet. The sign of the offset term is significant; see
+{{errors}}.
+
+t0 MUST NOT be derived from voice activity detection performed at run time. A run-time
+detector has a decision lag of its own, that lag is a term within the quantity being
+measured, and using it to define t0 would conceal the term.
+
+Annotation of the stimulus MUST NOT extend the speech end by a fixed constant. A fixed
+extension displaces t0 later by that constant and, since MRL is t1 minus t0, reduces
+every reported figure by the same constant. See {{errors}}.
+
+> \[\[EDITOR'S NOTE: the reference implementation uses decay-following hysteresis with a
+> short sliding RMS refinement. A normative specification has to decide how much of that
+> to mandate. The options are to specify the algorithm, to specify a conformance test
+> that any annotator MUST pass against a published reference signal, or to require only
+> that the annotation be published alongside the result so that a reviewer can
+> substitute their own. The second is probably the right answer and needs the reference
+> signal to be published as part of this work.\]\]
+
+## Interval end: t1 {#t1}
+
+t1 is the instant at which the first sample of the SUT's response reaches the calling
+endpoint, taken at the reference point.
+
+t1 MUST be determined by reassembling the received stream in RTP timestamp order,
+locating the response onset as specified in {{onset}}, and mapping the onset sample back
+through the packet that carried it.
+
+Two variants of t1 are defined, and both MUST be reported.
+
+### Ingress MRL {#ingress}
+
+Ingress MRL takes t1 at the arrival instant of the onset sample, that is, at the
+reference point with no buffering applied.
+
+Ingress MRL isolates the contribution of the SUT and of the network path from the
+buffering policy of the calling endpoint. Its variance under a jittered path is equal to
+the jitter of that path, which is the metric reporting the path faithfully rather than a
+limitation of the method.
+
+### Playout MRL {#playout}
+
+Playout MRL takes t1 at the instant at which the onset sample would be released from a
+de-jitter buffer of stated target depth.
+
+The target depth MUST be reported with the figure. The de-jitter model used MUST anchor
+on the minimum transit delay observed over a stated initial window, which is the
+behaviour adaptive buffers converge toward, rather than on the arrival instant of the
+first packet received.
+
+Playout MRL corresponds to the interval a caller waits and is the variant to compare
+against conversational turn-taking norms.
+
+Playout MRL is distinct from the one-way transmission delay addressed by {{G114}}, and
+the two are not interchangeable. One-way transmission delay concerns the time taken to
+carry audio across a path and applies to a conversation between two people, whereas MRL
+concerns the time a system takes to begin responding and includes transmission delay as
+one term among several. A system may satisfy the transmission delay guidance in {{G114}}
+on both legs and still exhibit an MRL an order of magnitude larger.
+
+### Both variants required
+
+An implementation MUST report both variants. Reporting Ingress MRL alone understates the
+interval experienced by a caller. Reporting Playout MRL alone conflates the SUT with the
+buffering policy of the calling endpoint.
+
+## Response onset {#onset}
+
+The instant at which audio begins has no unique definition, because synthesised speech
+commonly ramps in over tens of milliseconds rather than beginning at full level. Onset
+is therefore computed under three named variants, and the dispersion across them is a
+component of the reported uncertainty.
+
+| Variant | Above noise floor | Absolute floor | Sustained for |
+|---|---|---|---|
+| sensitive | 6 dB | -55 dBov | 10 ms |
+| headline | 10 dB | -50 dBov | 20 ms |
+| strict | 12 dB | -45 dBov | 30 ms |
+
+Levels are expressed in dBov, referenced to full-scale RMS.
+
+The `headline` variant is the reported figure. The spread of MRL across all three
+variants is the onset-definition uncertainty of the measurement and MUST be published
+alongside any headline figure. On an abrupt onset the spread is small; on a gradual ramp
+it grows with the ramp duration and becomes the dominant uncertainty term.
+
+Sub-frame refinement of the onset instant MUST use a short sliding RMS. Instantaneous
+sample magnitude crosses any fixed threshold on isolated noise peaks at a rate high
+enough to displace the boundary materially; see {{errors}}.
+
+## What constitutes response audio {#whatcounts}
+
+> \[\[EDITOR'S NOTE: this section is the principal open issue in this draft and is
+> presented as a question rather than a specification. It is expected to be the first
+> point raised in review.
+>
+> As written above, t1 is the onset of any audio from the SUT that exceeds the threshold.
+> A system that emits an earcon, a keystroke sound, or a filled pause such as "um" while
+> its language model is still generating will therefore record a very low MRL while
+> delivering no information to the caller within that interval. A system that waits and
+> then speaks the answer records a higher MRL. Ranking those two systems by MRL alone
+> rewards the wrong behaviour.
+>
+> Two candidate resolutions:
+>
+> (a) Keep MRL defined on first audio of any kind, since that is objectively detectable
+> without interpreting content, and add a REQUIRED disclosure flag indicating whether the
+> SUT emitted non-lexical audio before its substantive response, determined by a stated
+> procedure. MRL then measures responsiveness, and the flag prevents a reader mistaking
+> it for time to information.
+>
+> (b) Define a second metric, provisionally Time to Substantive Response, whose onset is
+> the first sample of audio that a stated classification procedure identifies as lexical
+> content, and require both to be reported. This is more informative and much harder to
+> specify without introducing a subjective judgement into a metric whose entire value is
+> that it has none.
+>
+> The author's inclination is (a), on the grounds that a metric an independent party
+> cannot reproduce is worse than a metric that needs a caveat. The question of how the
+> flag is determined without content interpretation remains open. Input sought.\]\]
+
+# Method of Measurement
+
+## Reference point {#refpoint}
+
+All timestamps MUST be taken at the RTP egress and ingress reference point of the
+calling endpoint, that is, immediately before a packet is passed to the operating system
+for transmission and immediately after a packet is received from it.
+
+The reference point is chosen so that the measurement includes every term a caller
+experiences downstream of the calling endpoint's own send path, and excludes the calling
+endpoint's own playout hardware, which is a property of the observer rather than of the
+SUT.
+
+## Stimulus requirements
+
+Stimulus material MUST be prerecorded and MUST be transmitted at the nominal frame rate
+of the codec in use. The stimulus MUST be hashed and the hash MUST be recorded with the
+capture, so that a changed stimulus invalidates a comparison loudly rather than
+silently.
+
+Codecs are those of {{RFC3551}} and {{G711}}; the method is codec independent, and the
+codec in use MUST be reported.
+
+## Transmission pacing
+
+The calling endpoint MUST measure the deviation of its own transmission instants from
+the nominal frame grid and MUST record the worst deviation observed during the call. An
+endpoint that cannot pace its own transmission has an unreliable t0 and therefore an
+unreliable MRL. See {{qc}}.
+
+## Capture contents
+
+A capture MUST contain raw payloads and raw timestamps only. A capture MUST NOT contain
+any derived quantity, including any latency figure.
+
+This requirement exists so that a revised onset definition, or a definition proposed by
+a reviewer, can be applied to existing data without repeating a collection. The
+uncertainty analysis in {{onset}} is not possible otherwise.
+
+## Clock requirements {#clocks}
+
+Both t0 and t1 MUST be taken from a single monotonic clock on the calling endpoint.
+
+Because the interval is the difference of two timestamps drawn from one clock on one
+host, the metric requires no synchronisation between the calling endpoint and the SUT,
+and is insensitive to offset between them. This is a deliberate property of the
+definition and distinguishes the method from one-way delay measurement, where clock
+synchronisation between the two hosts dominates the error budget as described in
+Section 3.7.1 of {{RFC7679}}.
+
+A wall-clock timestamp MAY be recorded in parallel for the sole purpose of correlating
+captures with traces obtained from the SUT. Any offset or skew in that clock affects
+such correlation only and MUST NOT affect the reported MRL.
+
+## Sources of error and calibration {#errors}
+
+An implementation MUST state its calibrated accuracy, and MUST state the conditions
+under which that calibration was obtained.
+
+Calibration is performed by replacing the SUT with a reference responder that replies at
+a programmed delay, so that ground truth is known exactly. Under each channel condition
+the offset from ground truth that the physics of the channel requires is predictable in
+advance: for Ingress MRL it is the base transit delay plus the mean jitter excess, and
+for Playout MRL it is the base transit delay plus the buffer target depth. The
+calibration criterion is therefore the residual after subtracting that predicted offset,
+rather than the raw difference from ground truth.
+
+Calibration MUST NOT be performed exclusively at programmed delays that are integer
+multiples of the frame period. A responder that evaluates its emission deadline once per
+received frame quantises its own output to the frame period, and that error is invisible
+at frame-commensurate delays because the deadline then falls on a frame boundary.
+
+The following error mechanisms are known to produce plausible-looking but incorrect
+figures, and an implementation is advised to test for each:
+
+Fixed annotation extension:
+: Extending the stimulus speech end by a constant biases every figure low by that
+  constant.
+
+Instantaneous-magnitude thresholding:
+: Sub-frame refinement on sample magnitude rather than a short sliding RMS displaces the
+  onset boundary late by an amount that depends on the channel noise level.
+
+Frame-quantised reference responder:
+: Adds a uniform error between zero and one frame period, invisible at frame-commensurate
+  calibration delays.
+
+Frame-offset sign error:
+: Using the wrong sign for the within-frame offset term of t0 produces a residual of
+  twice the offset with the opposite sign. A large bias accompanied by a tight spread is
+  the signature of a definitional or arithmetic error rather than of host timing noise,
+  and implementations are advised to report that discrimination automatically.
+
+Symmetric jitter modelling:
+: A simulated channel that models network jitter as zero-mean Gaussian permits a
+  minimum-tracking de-jitter anchor to sit earlier than the minimum transit delay allows,
+  which appears as a negative bias in Playout MRL. Network jitter is one-sided and has a
+  hard floor at the minimum transit delay. Sender pacing deviation is a different
+  mechanism and is symmetric, because a timer-driven sender can fire either early or
+  late.
+
+> \[\[EDITOR'S NOTE: the reference implementation's calibrated figures are published in
+> {{HARNESS}} and are deliberately not reproduced here. A metric specification that
+> carries one implementation's results becomes stale and invites the reader to treat
+> those figures as a conformance target. Confirm this is the right call in review.\]\]
+
+# Units of Measurement
+
+MRL is reported in milliseconds, signed, to a resolution of not coarser than 0.1 ms.
+
+Uncertainty terms accompanying the figure are reported in the same units.
+
+# Measurement Points and Measurement Domain
+
+The single measurement point is the calling endpoint's RTP reference point as defined in
+{{refpoint}}. No observation of the SUT's internal state is required, and none is
+assumed to be available.
+
+The measurement domain is the path between the calling endpoint and the SUT together
+with the SUT itself. The method does not separate the two, and reported figures are
+therefore properties of the pairing rather than of the SUT alone. Where separation is
+required, the path contribution has to be characterised independently and reported
+alongside.
+
+# Measurement Timing
+
+Each measurement corresponds to one stimulus and one response within one session. A
+reported distribution MUST state the number of measurements attempted and the number
+discarded, as required by {{qc}}.
+
+> \[\[TODO: specify whether multiple stimulus/response exchanges within a single session
+> are permitted, and if so what conditioning effects have to be reported. A system whose
+> nth turn is faster than its first because a model is warm is a real effect and the
+> draft currently has nothing to say about it.\]\]
+
+# Quality Control and Result Validity {#qc}
+
+Two classes of condition are defined.
+
+## Blocking conditions
+
+A measurement exhibiting any of the following MUST be discarded and MUST NOT be reported
+as a figure:
+
+* no speech end could be located in the stimulus;
+* no packets were received from the SUT;
+* no response onset was found;
+* the response onset fell within the first received frame, so that the true onset may
+  precede the observation window;
+* the worst transmission pacing deviation exceeded a stated threshold.
+
+The pacing threshold in the reference implementation is 5 ms. A calling endpoint that
+cannot pace its own transmission within that bound has an unreliable t0.
+
+Discarding a measurement under these conditions is correct behaviour. An implementation
+MUST NOT relax a blocking condition in order to retain a measurement.
+
+## Advisory conditions
+
+The following conditions do not invalidate a measurement but MUST be reported with it:
+
+* packet loss above a stated threshold;
+* late discard above a stated threshold.
+
+A call over a lossy path remains a valid measurement of a lossy path. Where the frame
+carrying the response onset is itself lost, onset detection is deferred by whole frames
+and the resulting figure is an upper bound rather than a point estimate, which is why
+the flag has to travel with the number.
+
+## Reporting of discards
+
+Every reported distribution MUST be accompanied by the count of measurements discarded.
+A run that discards a large fraction of its measurements is not comparable with one that
+discards none, irrespective of the percentiles of the survivors.
+
+# Reporting {#reporting}
+
+## Required fields
+
+A reported MRL figure MUST be accompanied by:
+
+* Ingress MRL and Playout MRL, both signed;
+* the playout target depth;
+* the onset variant used for the headline figure, and the spread across all three
+  variants;
+* the codec and frame period;
+* the number of measurements attempted and the number discarded;
+* any advisory flags raised;
+* the calibrated accuracy of the measuring implementation and the conditions of that
+  calibration;
+* an identifier for the SUT configuration sufficient to establish that two figures refer
+  to the same configuration, without necessarily disclosing that configuration.
+
+## Reporting format
+
+> \[\[TODO: specify an interchange record. This is the section that makes the document
+> useful to somebody who is not the author, and it does not yet exist in any form. The
+> reference implementation produces a JSON structure that is close to adequate and would
+> need tightening into a schema, with every field above mandatory and with the raw
+> capture referenced by hash. Draft it for -01.\]\]
+
+# Use and Applications
+
+The metric supports comparison of conversational voice systems from the position of a
+caller, characterisation of a single system across configurations or load levels, and
+regression testing of a deployed system over time.
+
+The metric is not a measure of response quality, of speech recognition accuracy, or of
+the usefulness of the response. It measures an interval and nothing else.
+
+# Applicability and Limitations {#limits}
+
+The metric as defined applies to systems that respond to a completed caller utterance
+with a discrete response. The following cases are outside its current scope or require
+care:
+
+Filler and non-lexical audio:
+: See {{whatcounts}}. Unresolved.
+
+Barge-in:
+: Where the caller interrupts the system, the interval defined here is not the quantity
+  of interest and the method does not address it.
+
+Incremental and streaming responses:
+: Where a system emits partial audio that it subsequently revises, first-audio onset does
+  not characterise the response.
+
+Path contribution:
+: As noted in the measurement domain, the figure is a property of the pairing of path and
+  SUT.
+
+Conditioning across turns:
+: See the open item under Measurement Timing.
+
+# Security Considerations
+
+The method described here generates traffic directed at a system under test and elicits
+responses from it. Measurement of a system operated by another party without that party's
+authorisation may constitute unauthorised use, may breach terms of service, and at
+sufficient volume is indistinguishable from a denial of service attempt. Parties
+performing measurement SHOULD obtain authorisation, SHOULD limit measurement rate to a
+level agreed with the operator, and SHOULD identify their traffic where a mechanism to do
+so exists.
+
+Captures produced by this method contain audio. Where stimulus material contains recorded
+human speech, that material is personal data in many jurisdictions and may carry
+biometric significance. Captures also contain the SUT's response audio, which may reflect
+the content of the stimulus. Implementers SHOULD prefer synthetic or consented stimulus
+material, SHOULD apply access control to stored captures, and SHOULD consider retention
+limits. Publication of captures as measurement evidence, which the method otherwise
+encourages, has to be weighed against this.
+
+Reported figures may be commercially sensitive to the operator of the system under test.
+The configuration identifier described in {{reporting}} is specified as an identifier
+rather than as the configuration itself so that reproducibility and confidentiality can
+coexist.
+
+# IANA Considerations
+
+> \[\[TODO: if registry entry is pursued, this section requests registration of the
+> entry in {{registry}} in the Performance Metrics Registry established by {{RFC8911}}.
+> If not, this section reads "This document has no IANA actions."\]\]
+
+# Future Work {#future}
+
+Conveying MRL between endpoints in band, by means of an RTCP Extended Report block in the
+manner of {{RFC3611}}, would allow a system to report the metric about itself rather than
+requiring an external caller to measure it. That is a separate document and a different
+working group.
+
+--- back
+
+# Draft Performance Metrics Registry Entry {#registry}
+
+> \[\[EDITOR'S NOTE: filled in against the column structure of Section 7 of {{RFC8911}}
+> as far as the current text supports. Incomplete deliberately; the gaps are the same
+> gaps flagged in the body.\]\]
+
+Identifier:
+: TBD by IANA
+
+Name:
+: TBD, following the naming convention of Section 7.1.2 of {{RFC8911}}
+
+URI:
+: TBD
+
+Description:
+: The interval between transmission of the final speech sample of a caller's utterance
+  and arrival of the first sample of a conversational voice system's response, observed
+  at the calling endpoint's RTP reference point.
+
+Change Controller:
+: IETF
+
+Version:
+: 1
+
+Reference Definition:
+: This document, {{t0}} through {{onset}}.
+
+Fixed Parameters:
+: Onset variant thresholds as tabulated in {{onset}}; de-jitter anchor rule as specified
+  in {{playout}}.
+
+Reference Method:
+: This document, Method of Measurement.
+
+Packet Stream Generation:
+: Prerecorded stimulus transmitted at the nominal frame rate of the codec in use.
+
+Traffic Filter:
+: The RTP stream of the session under measurement.
+
+Sampling Distribution:
+: TBD; see the open item under Measurement Timing.
+
+Runtime Parameters:
+: Codec, frame period, playout target depth, stimulus identifier and hash, SUT
+  configuration identifier.
+
+Roles:
+: Calling endpoint; system under test.
+
+Output Type:
+: Signed scalar, reported in two variants, with an uncertainty term.
+
+Metric Units:
+: Milliseconds.
+
+Calibration:
+: As specified in {{errors}}. An implementation reports its own calibrated accuracy and
+  the conditions of calibration.
+
+# Reference Implementation
+
+An open-source implementation of this method exists and is archived at {{HARNESS}}. It
+implements the metric definition, the onset variants, the quality control conditions and
+the calibration procedure described here, and it publishes per-host calibration results.
+
+This appendix is informative. Conformance is to this document, and any disagreement
+between this document and that implementation is a defect in the implementation.
+
+# RFC 6390 Template Coverage {#coverage}
+
+> \[\[EDITOR'S NOTE: remove before submission. Retained here so that gaps are visible
+> while the draft is being written.\]\]
+
+| RFC 6390 Section 5.4 item | Where | State |
+|---|---|---|
+| Metric Name | Metric Definition | done |
+| Metric Description | Metric Definition | done |
+| Method of Measurement or Calculation | Method of Measurement | mostly done; annotator conformance open |
+| Units of Measurement | Units of Measurement | done |
+| Measurement Point(s) with Potential Measurement Domain | Measurement Points | done |
+| Measurement Timing | Measurement Timing | open; multi-turn conditioning unspecified |
+| Use and Applications | Use and Applications | done |
+| Reporting Model | Reporting | fields done; interchange format missing |
+| Measurement error and uncertainty | Sources of Error | done |
+
+# Open Questions for Review {#questions}
+
+> \[\[EDITOR'S NOTE: remove before submission.\]\]
+
+1. Filler and non-lexical audio, {{whatcounts}}. The substantive open issue.
+2. Whether the stimulus annotation algorithm is specified normatively, replaced by a
+   conformance test against a published reference signal, or left to the implementer with
+   a publication requirement.
+3. Whether multi-turn measurement within one session is in scope, and what has to be
+   reported about warm-up effects.
+4. The interchange record in {{reporting}}.
+5. Whether Informational is the right category, or whether the conformance language
+   argues for Standards Track.
+6. Venue. Whether IPPM's charter admits a metric of this kind, and if not whether
+   DISPATCH or the Independent Submission stream is the better route. See the editor's
+   note in the Introduction.
+7. Whether registry registration is appropriate for an application-layer metric of this
+   kind.
+8. British spelling is used throughout this source. Confirm against current RFC Editor
+   style before submission and convert if required.
+
+# Acknowledgments
+{:numbered="false"}
+
+TBD.

@@ -1,0 +1,12 @@
+# Build output. The markdown source is authoritative; everything below is generated
+# by `make` and should be rebuilt rather than committed.
+draft-*.xml
+draft-*.txt
+draft-*.html
+kramdown.err
+
+# kramdown-rfc's bibliography cache, refetched on demand from bib.ietf.org
+.refcache/
+
+# macOS
+.DS_Store

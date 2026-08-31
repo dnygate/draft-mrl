@@ -1,0 +1,44 @@
+# Build the Internet-Draft from kramdown-rfc source.
+#
+# Toolchain lives outside this repository so that the harness venv keeps to the
+# dependency rule in CLAUDE.md (numpy at runtime, scipy optional, pytest for tests):
+#
+#   python3 -m venv ~/.venvs/ietf-tools && ~/.venvs/ietf-tools/bin/pip install xml2rfc
+#   gem install kramdown-rfc
+#
+# The gem executable directory is not on PATH under Homebrew Ruby, hence the
+# absolute path below. Adjust if the Ruby version changes.
+
+DRAFT   := draft-nygate-ippm-mrl-00
+KRAMDOWN := /opt/homebrew/lib/ruby/gems/4.0.0/bin/kramdown-rfc
+XML2RFC  := $(HOME)/.venvs/ietf-tools/bin/xml2rfc
+
+.PHONY: all txt html clean check
+
+all: txt
+
+txt: $(DRAFT).txt
+
+html: $(DRAFT).html
+
+$(DRAFT).xml: $(DRAFT).md
+	$(KRAMDOWN) $< > $@
+
+$(DRAFT).txt: $(DRAFT).xml
+	$(XML2RFC) --text $< -o $@
+
+$(DRAFT).html: $(DRAFT).xml
+	$(XML2RFC) --html $< -o $@
+
+# House style: em dashes are banned, and no tooling should be named anywhere.
+check: $(DRAFT).md
+	@echo "checking for em and en dashes"
+	@! grep -n "—\|–" $< || (echo "FAIL: dash found" && false)
+	@echo "checking for tooling references"
+	@! grep -ni "claude\|copilot\|chatgpt\|anthropic\|ai assistant" $< \
+		|| (echo "FAIL: tooling reference found" && false)
+	@echo "ok"
+
+clean:
+	rm -f $(DRAFT).xml $(DRAFT).txt $(DRAFT).html kramdown.err
+	rm -rf .refcache
