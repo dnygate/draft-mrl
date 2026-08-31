@@ -37,6 +37,17 @@ check: $(DRAFT).md
 	@echo "checking for tooling references"
 	@! grep -ni "claude\|copilot\|chatgpt\|anthropic\|ai assistant" $< \
 		|| (echo "FAIL: tooling reference found" && false)
+	@echo "checking for non-ASCII"
+	@# Internet-Draft text is conventionally ASCII and idnits reports anything else. A
+	@# typographically correct minus sign is exactly the kind of thing that arrives with
+	@# prose written elsewhere, so it is caught here rather than at submission. The wider
+	@# project deliberately uses U+2212 in its own documents, which is why this check
+	@# belongs to the draft alone.
+	@# Deleting every ASCII byte and counting the remainder is the portable test. BSD grep
+	@# expands no \x escapes and treats high bytes as printable even under LC_ALL=C, so
+	@# both of the obvious grep formulations silently pass everything.
+	@n=$$(tr -d '\000-\177' < $< | wc -c | tr -d ' '); \
+		if [ "$$n" != "0" ]; then echo "FAIL: $$n non-ASCII bytes in $<"; false; fi
 	@echo "ok"
 
 # Internet-Draft text is limited to 72 columns. xml2rfc wraps prose but leaves

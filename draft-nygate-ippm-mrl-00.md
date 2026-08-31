@@ -386,7 +386,7 @@ Detection across the whole received stream locates the greeting instead of the r
 Since the greeting precedes t0, the resulting MRL is large and negative, and because this
 document licenses negative values as genuine behaviour there is no bound against which such
 an error announces itself. In the reference implementation, a capture carrying an 800 ms
-greeting with a true MRL of 900 ms yielded −2085 ms and satisfied every condition in
+greeting with a true MRL of 900 ms yielded -2085 ms and satisfied every condition in
 {{qc}}.
 
 A greeting falling inside the noise-floor window is speech rather than channel noise, so it
