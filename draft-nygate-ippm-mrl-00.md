@@ -372,36 +372,70 @@ Sub-frame refinement of the onset instant MUST use a short sliding RMS. Instanta
 sample magnitude crosses any fixed threshold on isolated noise peaks at a rate high
 enough to displace the boundary materially; see {{errors}}.
 
-## What constitutes response audio {#whatcounts}
+## Unprompted audio {#greeting}
 
-> \[\[EDITOR'S NOTE: this section is the principal open issue in this draft and is
-> presented as a question rather than a specification. It is expected to be the first
-> point raised in review.
->
-> As written above, t1 is the onset of any audio from the SUT that exceeds the threshold.
-> A system that emits an earcon, a keystroke sound, or a filled pause such as "um" while
-> its language model is still generating will therefore record a very low MRL while
-> delivering no information to the caller within that interval. A system that waits and
-> then speaks the answer records a higher MRL. Ranking those two systems by MRL alone
-> rewards the wrong behaviour.
->
-> Two candidate resolutions:
->
-> (a) Keep MRL defined on first audio of any kind, since that is objectively detectable
-> without interpreting content, and add a REQUIRED disclosure flag indicating whether the
-> SUT emitted non-lexical audio before its substantive response, determined by a stated
-> procedure. MRL then measures responsiveness, and the flag prevents a reader mistaking
-> it for time to information.
->
-> (b) Define a second metric, provisionally Time to Substantive Response, whose onset is
-> the first sample of audio that a stated classification procedure identifies as lexical
-> content, and require both to be reported. This is more informative and much harder to
-> specify without introducing a subjective judgement into a metric whose entire value is
-> that it has none.
->
-> The author's inclination is (a), on the grounds that a metric an independent party
-> cannot reproduce is worse than a metric that needs a caveat. The question of how the
-> flag is determined without content interpretation remains open. Input sought.\]\]
+A conversational voice system commonly speaks before the caller does, opening with a
+greeting that arrives within a few hundred milliseconds of the session being established.
+That audio responds to nothing, because the caller has not yet spoken.
+
+Response-onset detection MUST NOT begin before the end of any such unprompted audio. The
+point at which it ended MUST be recorded in the capture, and the noise-floor estimate
+required by {{onset}} MUST be taken from audio following that point.
+
+Detection across the whole received stream locates the greeting instead of the response.
+Since the greeting precedes t0, the resulting MRL is large and negative, and because this
+document licenses negative values as genuine behaviour there is no bound against which such
+an error announces itself. In the reference implementation, a capture carrying an 800 ms
+greeting with a true MRL of 900 ms yielded −2085 ms and satisfied every condition in
+{{qc}}.
+
+A greeting falling inside the noise-floor window is speech rather than channel noise, so it
+raises the estimate and displaces every onset threshold derived from it. On the same
+capture the floor moved by 1.35 dB.
+
+A calling endpoint SHOULD NOT begin transmitting its stimulus while unprompted audio is
+still in progress. A system that implements barge-in detection will stop speaking when it
+hears the caller, which truncates the greeting and alters the interaction under
+measurement.
+
+The interval from session establishment to the onset of unprompted audio is a distinct and
+useful quantity, since a caller who hears nothing for several seconds after the line opens
+is poorly served whatever the system's MRL turns out to be. It shares no terms with MRL and
+is not defined here; see {{future}}.
+
+## Filler audio and response continuity {#whatcounts}
+
+t1 as defined in {{t1}} is the onset of the system's first response audio, whatever that
+audio happens to contain. A system that emits an earcon, a breath or a filled pause while
+its response is still being generated therefore records a low MRL while conveying nothing
+during that interval, and would rank above a system that stayed quiet and then answered.
+
+This document does not resolve that by identifying which audio carries meaning. A metric
+incorporating a judgement about meaning cannot be re-derived from a published capture by an
+independent reviewer, and that reproducibility is the property which makes the rest of this
+specification worth having. The discriminator is structural instead: filler is followed by
+silence before the substantive response begins, and continuous speech is not.
+
+An implementation MUST, within a window of 2000 ms following t1, measure the longest
+interval whose level lies below the onset threshold of the headline variant. Intervals
+carried by no packet MUST be excluded from that measurement, because a lost or
+late-discarded frame leaves a gap indistinguishable from a deliberate pause and would
+otherwise allow a degraded path to manufacture filler.
+
+Where that interval exceeds 150 ms:
+
+* the response MUST be reported as discontiguous;
+* a second onset MUST be reported, at the start of the final contiguous segment, together
+  with the MRL derived from it.
+
+MRL itself is unchanged by this section, so no figure measured under an earlier revision
+becomes invalid. A reader receives both onsets and can see whether they differ and by how
+much.
+
+The 2000 ms window and the 150 ms threshold are fixed by this document rather than left to
+the implementation, for the reason given in {{onset}}: figures derived under different
+parameters cannot be compared even when each is internally correct. Both MUST be reported
+alongside any figure derived under them.
 
 # Method of Measurement
 
@@ -647,6 +681,10 @@ Describes the choices along the axes in {{existing}}. All members are REQUIRED.
 `headline_variant`:
 : The `name` of the variant whose figures are quoted as the headline.
 
+`continuity_window_ms`, `continuity_gap_threshold_ms`:
+: The parameters of {{whatcounts}}, stated rather than assumed so that a report remains
+  interpretable if the defaults are ever revised.
+
 ### subject
 
 Identifies what was measured. `stimulus_id` and `stimulus_sha256` are REQUIRED.
@@ -674,6 +712,13 @@ Aggregate figures. All members are REQUIRED.
   `max`. This member MUST be present, since a headline figure quoted without it is
   incomplete under {{onset}}.
 
+`continuity`:
+: An object carrying `gap_p50_ms` and `gap_max_ms` over the reported measurements,
+  `n_discontiguous`, and a `contiguous` object of the same shape as `ingress` giving the
+  MRL to the start of uninterrupted speech. Where `n_discontiguous` is zero the
+  `contiguous` figures equal the `ingress` figures, which is the expected case and is
+  reported rather than omitted so that its absence never has to be inferred.
+
 `advisory_flags`:
 : An object mapping each advisory condition in {{qc}} to the number of reported
   measurements carrying it.
@@ -682,7 +727,9 @@ Aggregate figures. All members are REQUIRED.
 
 `measurements` SHOULD carry one object per individual measurement, each with the
 measurement's identifier, its t0 and t1 in nanoseconds on the instrument's monotonic
-clock, its ingress and playout MRL under every variant, and any flags raised. `captures`
+clock, its ingress and playout MRL under every variant, the continuity gap and contiguous
+onset from {{whatcounts}}, the end of any unprompted audio as required by {{greeting}},
+and any flags raised. `captures`
 SHOULD carry one object per capture with the measurement identifier, a `sha256` of the
 capture file, and a URI at which it can be obtained.
 
@@ -722,7 +769,9 @@ The following is a report with the per-measurement and capture arrays elided.
       { "name": "strict", "margin_db": 12.0,
         "absolute_dbov": -45.0, "sustain_ms": 30.0 }
     ],
-    "headline_variant": "headline"
+    "headline_variant": "headline",
+    "continuity_window_ms": 2000.0,
+    "continuity_gap_threshold_ms": 150.0
   },
   "subject": {
     "sut_identifier": "system-A",
@@ -746,7 +795,20 @@ The following is a report with the per-measurement and capture arrays elided.
       "p95_ms": 1083.2, "max_ms": 1141.7
     },
     "onset_definition_uncertainty_ms": { "p50": 4.7, "max": 9.8 },
-    "advisory_flags": { "high_loss": 1, "high_late_discard": 0 }
+    "continuity": {
+      "gap_p50_ms": 48.0,
+      "gap_max_ms": 512.0,
+      "n_discontiguous": 4,
+      "contiguous": {
+        "mean_ms": 941.7, "p50_ms": 802.0,
+        "p95_ms": 1418.6, "max_ms": 1461.0
+      }
+    },
+    "advisory_flags": {
+      "high_loss": 1,
+      "high_late_discard": 0,
+      "discontiguous_response": 4
+    }
   }
 }
 ~~~
@@ -781,7 +843,14 @@ with a discrete response. The following cases are outside its current scope or r
 care:
 
 Filler and non-lexical audio:
-: See {{whatcounts}}. Unresolved.
+: Addressed by the continuity measurement in {{whatcounts}}, which separates first audio
+  from first uninterrupted audio without interpreting content. A caller comparing systems
+  should read both figures, since MRL alone rewards a system for making a noise.
+
+Unprompted audio:
+: Handled by {{greeting}}, which requires detection to begin after any greeting. Without
+  that constraint the measurement locates the greeting, and the figure it produces
+  describes a different event.
 
 Barge-in:
 : Where the caller interrupts the system, the interval defined here is not the quantity
@@ -839,6 +908,13 @@ Conveying MRL between endpoints in band, by means of an RTCP Extended Report blo
 manner of {{RFC3611}}, would allow a system to report the metric about itself rather than
 requiring an external caller to measure it. That is a separate document and a different
 working group.
+
+Time to greeting, the interval from session establishment to the onset of the unprompted
+audio described in {{greeting}}, is a second quantity the method already observes without
+defining. It is at least as visible to a caller as MRL, and it appears to be published by
+nobody. Defining it here would widen this document beyond a single metric, so it is noted
+rather than specified, and it would sit naturally in whatever document this one becomes
+part of.
 
 --- back
 
@@ -937,7 +1013,12 @@ between this document and that implementation is a defect in the implementation.
 
 > \[\[EDITOR'S NOTE: remove before submission.\]\]
 
-1. Filler and non-lexical audio, {{whatcounts}}. The substantive open issue.
+1. Filler and non-lexical audio is now specified in {{whatcounts}} by a structural
+   discriminator rather than by content recognition, and implemented. What remains open is
+   whether 150 ms and 2000 ms are the right constants. They were chosen to sit well above
+   the pauses inside ordinary speech, measured at around 50 ms on the reference
+   implementation's material, and no corpus of real filler behaviour informed them yet.
+   Evidence welcome.
 2. Whether the stimulus annotation algorithm is specified normatively, replaced by a
    conformance test against a published reference signal, or left to the implementer with
    a publication requirement.
