@@ -23,7 +23,6 @@ venue:
 author:
   -
     fullname: Daniel Nygate
-    organization: Hudl Communications, Inc.
     email: daniel.nygate@unifiededge.com
 normative:
   RFC3550:
