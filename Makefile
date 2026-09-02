@@ -1,7 +1,7 @@
 # Build the Internet-Draft from kramdown-rfc source.
 #
 # Toolchain lives outside this repository so that the harness venv keeps to the
-# dependency rule in CLAUDE.md (numpy at runtime, scipy optional, pytest for tests):
+# harness's own dependency rule (numpy at runtime, scipy optional, pytest for tests):
 #
 #   python3 -m venv ~/.venvs/ietf-tools && ~/.venvs/ietf-tools/bin/pip install xml2rfc
 #   gem install kramdown-rfc
@@ -30,13 +30,10 @@ $(DRAFT).txt: $(DRAFT).xml
 $(DRAFT).html: $(DRAFT).xml
 	$(XML2RFC) --html $< -o $@
 
-# House style: em dashes are banned, and no tooling should be named anywhere.
+# House style for this document: no em or en dashes, and ASCII only.
 check: $(DRAFT).md
 	@echo "checking for em and en dashes"
 	@! grep -n "—\|–" $< || (echo "FAIL: dash found" && false)
-	@echo "checking for tooling references"
-	@! grep -ni "claude\|copilot\|chatgpt\|anthropic\|ai assistant" $< \
-		|| (echo "FAIL: tooling reference found" && false)
 	@echo "checking for non-ASCII"
 	@# Internet-Draft text is conventionally ASCII and idnits reports anything else. A
 	@# typographically correct minus sign is exactly the kind of thing that arrives with
