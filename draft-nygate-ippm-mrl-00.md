@@ -518,9 +518,15 @@ Fixed annotation extension:
 : Extending the stimulus speech end by a constant biases every figure low by that
   constant.
 
-Instantaneous-magnitude thresholding:
-: Sub-frame refinement on sample magnitude rather than a short sliding RMS displaces the
-  onset boundary late by an amount that depends on the channel noise level.
+Instantaneous-magnitude thresholding, at either boundary:
+: Sub-frame refinement on sample magnitude rather than a short sliding RMS lets isolated
+  noise peaks cross the threshold. At the stimulus end boundary this displaces t0 late; at
+  the response onset it displaces t1 early, biasing MRL low by up to one analysis window.
+  The second was masked in the reference implementation for as long as its calibration
+  responder placed responses on the analysis grid, and surfaced only once a media-clock
+  responder placed them where they began: it accounted for the whole of a -0.40 ms
+  headline bias and a 0.99 ms spread between onset variants on a hard onset. A fix applied
+  at one boundary has to be checked against its mirror.
 
 Frame-quantised reference responder:
 : Adds a uniform error between zero and one frame period, invisible at frame-commensurate
