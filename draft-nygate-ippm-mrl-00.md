@@ -143,7 +143,9 @@ incomparable, and those axes are the reason this document exists:
 * the reference point at which the response is observed, which may be an RTP endpoint,
   a recording made by a carrier or a conferencing bridge, or an endpoint's audio device,
   each placing a different and frequently uncharacterised quantity of transport and
-  buffering inside the measured interval;
+  buffering inside the measured interval. {{elsewhere}} enumerates these so that a party
+  observing anywhere on that list can produce a conforming report which declares the
+  difference, and {{characterise}} gives a way to measure it rather than disclose it;
 * the determination of the caller's speech end, which may be derived from a voice
   activity detector applied to the transmitted audio, or from prior annotation of known
   stimulus material;
@@ -460,6 +462,48 @@ experiences downstream of the calling endpoint's own send path, and excludes the
 endpoint's own playout hardware, which is a property of the observer rather than of the
 SUT.
 
+## Observing elsewhere {#elsewhere}
+
+Not every party measuring this quantity controls an RTP endpoint. A figure derived from a
+carrier's call recording is a real measurement of something a caller experienced, and
+declaring it as such is more useful than being unable to describe it at all.
+
+An implementation MAY therefore observe at a point other than the one in {{refpoint}},
+provided it declares which, and provided it discloses what that choice places inside the
+measured interval. Such a report conforms to this document. What it does not do is
+produce a figure comparable with one taken at the RTP reference point, because the two
+intervals contain different terms.
+
+| `reference_point` | observed at | additional terms inside the interval |
+|---|---|---|
+| `rtp-endpoint` | immediately before the packet is passed to the operating system, and immediately after it is received from it | none; this is {{refpoint}} |
+| `host-packet-capture` | a packet capture facility on the calling host | the host's own network stack, and asymmetrically: on transmission the capture is taken after the send path, on reception before the application reads |
+| `bridge-recording` | a session border controller or conferencing bridge in the path | the leg between caller and bridge in both directions, and the bridge's own media handling |
+| `carrier-recording` | a recording made by a carrier or communications platform | the leg to the carrier in both directions, any transcoding it performs, its buffering, and its recording pipeline |
+| `endpoint-audio-device` | the caller's audio device, or a loopback capture of it | the endpoint's de-jitter buffer, its audio stack and the device's own latency |
+
+Where a value other than `rtp-endpoint` is declared, the additional terms MUST be
+disclosed and the figure MUST be reported as an upper bound rather than a point estimate,
+unless those terms have been characterised as below. Figures taken at different reference
+points MUST NOT be pooled into one distribution.
+
+### Characterising the additional terms {#characterise}
+
+An upper bound is a weaker result than it needs to be, and the additional terms are
+measurable rather than merely acknowledgeable.
+
+Where the path to the system under test traverses infrastructure the measuring party does
+not control, an implementation SHOULD place a second call over the same route to a
+responder replying at a delay it has programmed, and subtract that measurement from the
+first. The infrastructure's contribution is common to both and cancels, leaving the
+system's response. Two routes over the same carrier are not identical, so this bounds the
+additional terms rather than eliminating them exactly, and the bound is what should be
+reported.
+
+This is the same differential construction the calibration in {{errors}} uses, applied to
+a term outside the instrument instead of inside it. It turns a disclosed caveat into a
+measured quantity, and it is available to any party that can dial a number it controls.
+
 ## Stimulus requirements
 
 Stimulus material MUST be prerecorded and MUST be transmitted at the nominal frame rate
@@ -712,10 +756,11 @@ Describes the measuring implementation and its calibration. All members are REQU
 Describes the choices along the axes in {{existing}}. All members are REQUIRED.
 
 `reference_point`:
-: Where t1 was observed. The value `rtp-endpoint` denotes the reference point defined in
-  {{refpoint}}. Any other value denotes an observation point that includes additional and
-  possibly uncharacterised transport, and MUST be accompanied by `reference_point_notes`
-  describing what lies inside the interval.
+: Where t1 was observed, taking one of the values enumerated in {{elsewhere}}. Any value
+  other than `rtp-endpoint` MUST be accompanied by `reference_point_notes` stating what
+  that choice places inside the measured interval, and by `reference_point_bound_ms`
+  where the additional terms have been characterised as in {{characterise}}, or `null`
+  where they have not and the figures are therefore upper bounds.
 
 `codec`, `frame_period_ms`, `sample_rate_hz`:
 : The media parameters in force.
@@ -813,6 +858,8 @@ The following is a report with the per-measurement and capture arrays elided.
   },
   "measurement": {
     "reference_point": "rtp-endpoint",
+    "reference_point_notes": null,
+    "reference_point_bound_ms": null,
     "codec": "PCMU",
     "frame_period_ms": 20.0,
     "sample_rate_hz": 8000,
@@ -919,7 +966,8 @@ Incremental and streaming responses:
 
 Path contribution:
 : As noted in the measurement domain, the figure is a property of the pairing of path and
-  SUT.
+  SUT. Where the path includes infrastructure the measuring party does not control,
+  {{characterise}} bounds its contribution rather than leaving it as a caveat.
 
 Conditioning across turns:
 : See the open item under Measurement Timing.
@@ -1072,10 +1120,10 @@ more efficient way to obtain useful review than letting each reader rediscover t
    the archived implementation as it is here.
 3. Whether multi-turn measurement within one session is in scope, and what has to be
    reported about warm-up effects.
-4. The interchange record in {{format}}. Whether it warrants a registered media type,
-   and whether `reference_point` should enumerate observation points other than the RTP
-   endpoint so that efforts measuring from a carrier recording can produce conforming
-   reports which declare that difference.
+4. The interchange record in {{format}}, specifically whether it warrants a registered
+   media type. The `reference_point` enumeration of {{elsewhere}} answers the other half
+   of what this question used to ask; what remains open there is whether the list is the
+   right list, since it was drawn from observed practice rather than from a survey.
 5. Whether Informational is the right category, or whether the conformance language
    argues for Standards Track.
 6. Venue. Whether IPPM's charter admits a metric of this kind, and if not whether
