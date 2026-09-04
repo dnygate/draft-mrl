@@ -291,13 +291,23 @@ Annotation of the stimulus MUST NOT extend the speech end by a fixed constant. A
 extension displaces t0 later by that constant and, since MRL is t1 minus t0, reduces
 every reported figure by the same constant. See {{errors}}.
 
-> \[\[EDITOR'S NOTE: the reference implementation uses decay-following hysteresis with a
-> short sliding RMS refinement. A normative specification has to decide how much of that
-> to mandate. The options are to specify the algorithm, to specify a conformance test
-> that any annotator MUST pass against a published reference signal, or to require only
-> that the annotation be published alongside the result so that a reviewer can
-> substitute their own. The second is probably the right answer and needs the reference
-> signal to be published as part of this work.\]\]
+An implementation MUST NOT be required to use any particular annotation algorithm, and
+MUST be able to demonstrate that its annotation agrees with a published reference. The
+reference implementation uses decay-following hysteresis with a short sliding RMS
+refinement, and publishes a frozen stimulus signal whose speech end is exact by
+construction, together with the boundary its own annotator locates {{HARNESS}}. An
+implementation claiming conformance SHOULD reproduce that boundary and MUST state the
+deviation where it does not.
+
+Specifying the conformance test rather than the algorithm is deliberate. The quantity that
+matters to a reader is whether two parties locate the same boundary in the same audio, and
+an algorithm mandated in prose can be implemented differently by two careful people while
+a boundary in a published waveform cannot be argued about.
+
+> \[\[EDITOR'S NOTE: the reference signal is frozen bytes rather than a generator seed,
+> because a signal rebuilt by its generator changes when the generator does. Whether the
+> signal itself should be carried in an IANA registry, an appendix, or by reference to the
+> archived implementation is a question for the working group; reference is assumed here.\]\]
 
 ## Interval end: t1 {#t1}
 
@@ -1033,9 +1043,10 @@ between this document and that implementation is a defect in the implementation.
    the pauses inside ordinary speech, measured at around 50 ms on the reference
    implementation's material, and no corpus of real filler behaviour informed them yet.
    Evidence welcome.
-2. Whether the stimulus annotation algorithm is specified normatively, replaced by a
-   conformance test against a published reference signal, or left to the implementer with
-   a publication requirement.
+2. The stimulus annotation rule is now a conformance test against a published reference
+   signal rather than a mandated algorithm, and the signal exists. What remains open is
+   where the signal should live: carried in this document, registered, or referenced in
+   the archived implementation as it is here.
 3. Whether multi-turn measurement within one session is in scope, and what has to be
    reported about warm-up effects.
 4. The interchange record in {{format}}. Whether it warrants a registered media type,
