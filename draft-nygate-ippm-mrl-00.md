@@ -1118,25 +1118,19 @@ more efficient way to obtain useful review than letting each reader rediscover t
    signal rather than a mandated algorithm, and the signal exists. What remains open is
    where the signal should live: carried in this document, registered, or referenced in
    the archived implementation as it is here.
-3. Whether multi-turn measurement within one session is in scope, and what has to be
-   reported about warm-up effects.
-4. The interchange record in {{format}}, specifically whether it warrants a registered
+3. The interchange record in {{format}}, specifically whether it warrants a registered
    media type. The `reference_point` enumeration of {{elsewhere}} answers the other half
    of what this question used to ask; what remains open there is whether the list is the
    right list, since it was drawn from observed practice rather than from a survey.
-5. Whether Informational is the right category, or whether the conformance language
+4. Whether Informational is the right category, or whether the conformance language
    argues for Standards Track.
-6. Venue. Whether IPPM's charter admits a metric of this kind, and if not whether
+5. Venue. Whether IPPM's charter admits a metric of this kind, and if not whether
    DISPATCH or the Independent Submission stream is the better route. See the editor's
    note in the Introduction.
-7. Whether registry registration is appropriate for an application-layer metric of this
+6. Whether registry registration is appropriate for an application-layer metric of this
    kind.
-8. Whether {{turns}} draws the line in the right place. It requires the turn index to be
+7. Whether {{turns}} draws the line in the right place. It requires the turn index to be
    recorded and forbids silent pooling, and it deliberately does not prescribe how many
    turns to measure. An argument that a fixed number belongs in the specification, for
    comparability, is one the author would want to hear.
 
-# Acknowledgements
-{:numbered="false"}
-
-TBD.
