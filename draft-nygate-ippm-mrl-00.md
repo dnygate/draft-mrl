@@ -589,14 +589,40 @@ alongside.
 
 # Measurement Timing
 
-Each measurement corresponds to one stimulus and one response within one session. A
-reported distribution MUST state the number of measurements attempted and the number
-discarded, as required by {{qc}}.
+Each measurement corresponds to one stimulus and one response. A reported distribution
+MUST state the number of measurements attempted and the number discarded, as required by
+{{qc}}.
 
-> \[\[TODO: specify whether multiple stimulus/response exchanges within a single session
-> are permitted, and if so what conditioning effects have to be reported. A system whose
-> nth turn is faster than its first because a model is warm is a real effect and the
-> draft currently has nothing to say about it.\]\]
+## Turns within a session {#turns}
+
+Several exchanges within one session are permitted and are the realistic case, since a
+caller does not hang up after one question. They are not interchangeable, though, and a
+report that pools them without saying so is not comparable with one that does not.
+
+A system's first response in a session carries terms that later responses do not: session
+establishment, whatever a model does on a cold start, caches not yet populated, and
+connections not yet open. Later responses may in turn benefit from conversational state
+the system has accumulated. Both effects are real properties of the system rather than
+measurement artefacts, and both are invisible in an aggregate that does not record which
+turn each measurement came from.
+
+Therefore:
+
+* each measurement MUST record its turn index within the session, counting from one;
+* a reported distribution MUST state which turn indices it covers;
+* first-turn measurements MUST NOT be pooled with later ones unless the report states
+  that they are pooled and gives the counts of each.
+
+This specifies what must be reported rather than how many turns to measure. A study of
+cold-start behaviour measuring only first turns, and a study of steady-state behaviour
+discarding them, are both valid and are answering different questions; what makes them
+comparable to each other is that both said which they did.
+
+A calling endpoint conducting a multi-turn session MUST NOT transmit its next stimulus
+while the system is still speaking, for the reason given in {{greeting}}: a system
+implementing barge-in detection will stop, which alters the interaction under
+measurement. Locating the end of the system's turn is the same problem as locating the
+end of a greeting and admits the same solution.
 
 # Quality Control and Result Validity {#qc}
 
@@ -723,6 +749,12 @@ Aggregate figures. All members are REQUIRED.
 `n_attempted`, `n_reported`, `n_discarded`:
 : Counts of measurements. `n_attempted` MUST equal `n_reported` plus `n_discarded`.
 
+`turn_indices`:
+: The turn indices this distribution covers, and the count of measurements from each.
+  REQUIRED by {{turns}}, which forbids pooling a first turn with later ones without
+  saying so. A single-turn study reports one entry, which is the honest way to say that
+  the figures describe cold starts.
+
 `discard_reasons`:
 : An object mapping each blocking condition in {{qc}} to the number of measurements it
   discarded. The counts MUST sum to `n_discarded`.
@@ -750,10 +782,10 @@ Aggregate figures. All members are REQUIRED.
 ### measurements and captures
 
 `measurements` SHOULD carry one object per individual measurement, each with the
-measurement's identifier, its t0 and t1 in nanoseconds on the instrument's monotonic
-clock, its ingress and playout MRL under every variant, the continuity gap and contiguous
-onset from {{whatcounts}}, the end of any unprompted audio as required by {{greeting}},
-and any flags raised. `captures`
+measurement's identifier, its session identifier and turn index as required by {{turns}},
+its t0 and t1 in nanoseconds on the instrument's monotonic clock, its ingress and playout
+MRL under every variant, the continuity gap and contiguous onset from {{whatcounts}}, the
+end of any unprompted audio as required by {{greeting}}, and any flags raised. `captures`
 SHOULD carry one object per capture with the measurement identifier, a `sha256` of the
 capture file, and a URI at which it can be obtained.
 
@@ -807,6 +839,7 @@ The following is a report with the per-measurement and capture arrays elided.
     "n_attempted": 20,
     "n_reported": 18,
     "n_discarded": 2,
+    "turn_indices": { "1": 8, "2": 5, "3": 5 },
     "discard_reasons": {
       "onset_not_found": 1, "tx_pacing_deviation": 1
     },
@@ -922,9 +955,15 @@ coexist.
 
 # IANA Considerations
 
-> \[\[TODO: if registry entry is pursued, this section requests registration of the
-> entry in {{registry}} in the Performance Metrics Registry established by {{RFC8911}}.
-> If not, this section reads "This document has no IANA actions."\]\]
+This document has no IANA actions.
+
+Registration of this metric in the Performance Metrics Registry established by
+{{RFC8911}} would be a reasonable later step, and {{registry}} shows what such an entry
+would contain. It is deliberately not requested here. The registry has to date been
+populated with IP-layer path metrics {{RFC8912}}, so eligibility for a metric of this
+kind is a question for the working group rather than an entitlement to assert in an
+individual submission, and a request made before the venue question of {{existing}} is
+settled would be moot if this work moves elsewhere.
 
 # Future Work {#future}
 
@@ -1015,27 +1054,11 @@ the calibration procedure described here, and it publishes per-host calibration 
 This appendix is informative. Conformance is to this document, and any disagreement
 between this document and that implementation is a defect in the implementation.
 
-# RFC 6390 Template Coverage {#coverage}
-
-> \[\[EDITOR'S NOTE: remove before submission. Retained here so that gaps are visible
-> while the draft is being written.\]\]
-
-| RFC 6390 Section 5.4 item | Class | Where | State |
-|---|---|---|---|
-| Metric Name | normative | Metric Definition | done |
-| Metric Description | normative | Metric Definition | done |
-| Method of Measurement or Calculation | normative | Method of Measurement | mostly done; annotator conformance open |
-| Units of Measurement | normative | Units of Measurement | done |
-| Measurement Point(s) with Potential Measurement Domain | normative | Measurement Points | done |
-| Measurement Timing | normative | Measurement Timing | open; multi-turn conditioning unspecified |
-| Implementation | informative | Appendix, Reference Implementation | done |
-| Verification | informative | Sources of Error and Calibration | done |
-| Use and Applications | informative | Use and Applications | done |
-| Reporting Model | informative | Reporting | done; media type registration open |
-
 # Open Questions for Review {#questions}
 
-> \[\[EDITOR'S NOTE: remove before submission.\]\]
+This appendix is retained deliberately rather than removed before submission. An
+individual submission exists to attract review, and the author's own list of doubts is a
+more efficient way to obtain useful review than letting each reader rediscover them.
 
 1. Filler and non-lexical audio is now specified in {{whatcounts}} by a structural
    discriminator rather than by content recognition, and implemented. What remains open is
@@ -1060,8 +1083,10 @@ between this document and that implementation is a defect in the implementation.
    note in the Introduction.
 7. Whether registry registration is appropriate for an application-layer metric of this
    kind.
-8. British spelling is used throughout this source. Confirm against current RFC Editor
-   style before submission and convert if required.
+8. Whether {{turns}} draws the line in the right place. It requires the turn index to be
+   recorded and forbids silent pooling, and it deliberately does not prescribe how many
+   turns to measure. An argument that a fixed number belongs in the specification, for
+   comparability, is one the author would want to hear.
 
 # Acknowledgements
 {:numbered="false"}
