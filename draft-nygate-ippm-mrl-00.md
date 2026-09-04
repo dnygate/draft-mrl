@@ -540,6 +540,14 @@ Symmetric jitter modelling:
   mechanism and is symmetric, because a timer-driven sender can fire either early or
   late.
 
+Calibration source that is not an honest RTP sender:
+: A reference responder whose RTP timestamps count frames rather than follow a media
+  clock, or whose idle-stream pacing depends on whether it is receiving anything,
+  produces playout figures with errors that ingress cannot see, since ingress is derived
+  from arrival and playout through the timestamp. Observed as a 44.7 ms transit slip
+  that flagged late discard on jitter-free calls, and 9.54 ms of playout spread that no
+  buffer target reduced. Both surfaced only from kept captures over a real path.
+
 > \[\[EDITOR'S NOTE: the reference implementation's calibrated figures are published in
 > {{HARNESS}} and are deliberately not reproduced here. A metric specification that
 > carries one implementation's results becomes stale and invites the reader to treat
