@@ -474,7 +474,7 @@ measured interval. Such a report conforms to this document. What it does not do 
 produce a figure comparable with one taken at the RTP reference point, because the two
 intervals contain different terms.
 
-| `reference_point` | observed at | additional terms inside the interval |
+| reference_point | observed at | additional terms inside the interval |
 |---|---|---|
 | `rtp-endpoint` | immediately before the packet is passed to the operating system, and immediately after it is received from it | none; this is {{refpoint}} |
 | `host-packet-capture` | a packet capture facility on the calling host | the host's own network stack, and asymmetrically: on transmission the capture is taken after the send path, on reception before the application reads |
