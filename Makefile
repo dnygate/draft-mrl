@@ -21,8 +21,20 @@ txt: $(DRAFT).txt
 
 html: $(DRAFT).html
 
+# kramdown-rfc emits v2 RFCXML vocabulary regardless of `v: 3` in the front matter or the
+# --v3 flag, both of which change its processing rules rather than its output vocabulary.
+# The submission tool prefers v3, and idnits reports every <texttable>, <ttcol>, <c>,
+# <list> and <spanx> as a deprecated element: 57 warnings on this document. So the build
+# upgrades with xml2rfc --v2v3 and strips kramdown's <?line?> source markers, which exist
+# to map xml2rfc errors back to markdown and carry no meaning in a submitted artifact.
+# Verified byte-identical rendered text before and after both steps.
 $(DRAFT).xml: $(DRAFT).md
-	$(KRAMDOWN) $< > $@
+	$(KRAMDOWN) $< > $@.v2
+	$(XML2RFC) --v2v3 $@.v2 -o $@.v3
+	sed 's/<?line *-\{0,1\}[0-9]*?>//g' $@.v3 > $@
+	@rm -f $@.v2 $@.v3
+	@grep -q 'version="3"' $@ || (echo "FAIL: upgrade did not produce v3" && false)
+	@! grep -q '<?line' $@ || (echo "FAIL: line PIs survived" && false)
 
 $(DRAFT).txt: $(DRAFT).xml
 	$(XML2RFC) --text $< -o $@
@@ -55,5 +67,5 @@ lint: $(DRAFT).txt
 		echo "FAIL: over-length lines above"; false; else echo "ok"; fi
 
 clean:
-	rm -f $(DRAFT).xml $(DRAFT).txt $(DRAFT).html kramdown.err
+	rm -f $(DRAFT).xml $(DRAFT).xml.v2 $(DRAFT).xml.v3 $(DRAFT).txt $(DRAFT).html kramdown.err
 	rm -rf .refcache
